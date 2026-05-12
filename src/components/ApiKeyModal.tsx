@@ -2,10 +2,11 @@ import { useState } from 'react'
 
 interface Props {
   onSave: (key: string) => void
+  initialKey?: string
 }
 
-export function ApiKeyModal({ onSave }: Props) {
-  const [key, setKey] = useState('')
+export function ApiKeyModal({ onSave, initialKey = '' }: Props) {
+  const [key, setKey] = useState(initialKey)
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()

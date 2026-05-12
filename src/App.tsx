@@ -145,6 +145,7 @@ export default function App() {
       {/* API Key modal */}
       {showKeyModal && (
         <ApiKeyModal
+          initialKey={apiKey ?? ''}
           onSave={(key) => {
             setApiKey(key)
             setShowKeyModal(false)
