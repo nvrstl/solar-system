@@ -124,31 +124,44 @@ export function fillRoofWithPanels(
   const stepY = heightM * cosTilt + gutterY
   const hw = widthM / 2
 
-  const panels: Panel[] = []
-  let idx = 0
+  // Try several origin offsets within one cell; keep the layout that
+  // packs the most panels. A small grid sweep is enough — the optimum
+  // tends to lie near edge-aligned positions.
+  const SWEEP = 12
+  let bestCorners: { x: number; y: number }[][] = []
 
-  for (let cx = minX + widthM / 2; cx < maxX; cx += stepX) {
-    for (let cy = minY + hhProjected; cy < maxY; cy += stepY) {
-      const corners = [
-        { x: cx - hw, y: cy - hhProjected },
-        { x: cx + hw, y: cy - hhProjected },
-        { x: cx + hw, y: cy + hhProjected },
-        { x: cx - hw, y: cy + hhProjected },
-      ]
+  for (let ix = 0; ix < SWEEP; ix++) {
+    const offX = (ix / SWEEP) * stepX
+    for (let iy = 0; iy < SWEEP; iy++) {
+      const offY = (iy / SWEEP) * stepY
 
-      // All 4 corners must be inside the inset polygon
-      if (!corners.every((c) => pointInPolygon(c, inset))) continue
+      const candidate: { x: number; y: number }[][] = []
+      for (let cx = minX + hw + offX; cx <= maxX - hw + 1e-6; cx += stepX) {
+        for (let cy = minY + hhProjected + offY; cy <= maxY - hhProjected + 1e-6; cy += stepY) {
+          const corners = [
+            { x: cx - hw, y: cy - hhProjected },
+            { x: cx + hw, y: cy - hhProjected },
+            { x: cx + hw, y: cy + hhProjected },
+            { x: cx - hw, y: cy + hhProjected },
+          ]
+          if (!corners.every((c) => pointInPolygon(c, inset))) continue
+          candidate.push(corners)
+        }
+      }
 
-      const worldCorners = corners.map((c) => rotatePt(c, ridgeAngle))
-      const latLngCorners = worldCorners.map((c) => xyToLatLng(c, ref))
-
-      panels.push({
-        id: `panel-${idx++}`,
-        enabled: true,
-        corners: latLngCorners,
-      })
+      if (candidate.length > bestCorners.length) bestCorners = candidate
     }
   }
+
+  const panels: Panel[] = bestCorners.map((corners, idx) => {
+    const worldCorners = corners.map((c) => rotatePt(c, ridgeAngle))
+    const latLngCorners = worldCorners.map((c) => xyToLatLng(c, ref))
+    return {
+      id: `panel-${idx}`,
+      enabled: true,
+      corners: latLngCorners,
+    }
+  })
 
   return panels
 }
