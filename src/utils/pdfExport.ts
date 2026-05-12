@@ -123,17 +123,25 @@ export async function exportPDF(params: ExportParams): Promise<void> {
 
   // ── Map image ───────────────────────────────────────────────
   cursorY += 4 + linesUsed * 5
-  const imgW = pageW - 20
-  const imgH = (canvas.height / canvas.width) * imgW
-  const clampedH = Math.min(imgH, 100)
+  const maxImgW = pageW - 20
+  const maxImgH = 100
+  const aspect = canvas.width / canvas.height
+  // Fit within (maxImgW, maxImgH) preserving aspect ratio.
+  let drawW = maxImgW
+  let drawH = drawW / aspect
+  if (drawH > maxImgH) {
+    drawH = maxImgH
+    drawW = drawH * aspect
+  }
+  const imgX = 10 + (maxImgW - drawW) / 2
 
   // Thin navy border around the map
   pdf.setDrawColor(...NAVY)
   pdf.setLineWidth(0.4)
-  pdf.rect(10, cursorY, imgW, clampedH)
-  pdf.addImage(imgData, 'JPEG', 10, cursorY, imgW, clampedH)
+  pdf.rect(imgX, cursorY, drawW, drawH)
+  pdf.addImage(imgData, 'JPEG', imgX, cursorY, drawW, drawH)
 
-  cursorY += clampedH + 10
+  cursorY += drawH + 10
 
   // ── System summary card (navy with mint numbers) ───────────
   const cardH = 38
