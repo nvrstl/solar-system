@@ -138,6 +138,7 @@ export default function App() {
             onPanelsChange={handlePanelsChange}
             onRoofCentroid={handleRoofCentroid}
             onResetRoof={handleResetRoof}
+            onAddressResolved={setAddress}
           />
         </main>
       </div>

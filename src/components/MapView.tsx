@@ -14,6 +14,7 @@ interface Props {
   onPanelsChange: (panels: Panel[]) => void
   onRoofCentroid: (latLng: LatLng) => void
   onResetRoof: () => void
+  onAddressResolved?: (address: string) => void
 }
 
 const ENABLED_STYLE = {
@@ -48,6 +49,7 @@ export function MapView({
   onPanelsChange,
   onRoofCentroid,
   onResetRoof,
+  onAddressResolved,
 }: Props) {
   const mapDivRef = useRef<HTMLDivElement>(null)
   const mapRef = useRef<google.maps.Map | null>(null)
@@ -96,6 +98,9 @@ export function MapView({
 
   const onRoofCentroidRef = useRef(onRoofCentroid)
   useEffect(() => { onRoofCentroidRef.current = onRoofCentroid }, [onRoofCentroid])
+
+  const onAddressResolvedRef = useRef(onAddressResolved)
+  useEffect(() => { onAddressResolvedRef.current = onAddressResolved }, [onAddressResolved])
 
   const azimuthRef = useRef(azimuth)
   useEffect(() => { azimuthRef.current = azimuth }, [azimuth])
@@ -241,6 +246,8 @@ export function MapView({
           map.panTo(place.geometry.location)
           map.setZoom(20)
         }
+        const resolved = place.formatted_address || place.name
+        if (resolved) onAddressResolvedRef.current?.(resolved)
       })
     }
 
