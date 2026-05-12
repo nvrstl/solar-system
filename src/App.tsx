@@ -17,9 +17,10 @@ const DEFAULT_ROI: ROIInputs = {
 }
 
 export default function App() {
-  // API key
+  // API key: localStorage override wins, then build-time env var, then prompt.
+  const envKey = (import.meta.env.VITE_GMAPS_API_KEY as string | undefined) ?? null
   const [apiKey, setApiKey] = useState<string | null>(
-    () => localStorage.getItem('gmaps_api_key')
+    () => localStorage.getItem('gmaps_api_key') || envKey
   )
   const [showKeyModal, setShowKeyModal] = useState(!apiKey)
 
