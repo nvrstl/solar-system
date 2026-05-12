@@ -8,8 +8,11 @@ interface UseGoogleMapsResult {
 declare global {
   interface Window {
     initMap?: () => void
+    gm_authFailure?: () => void
   }
 }
+
+const SCRIPT_ID = 'gmaps-js-sdk'
 
 export function useGoogleMaps(apiKey: string | null): UseGoogleMapsResult {
   const [isLoaded, setIsLoaded] = useState(false)
@@ -18,26 +21,40 @@ export function useGoogleMaps(apiKey: string | null): UseGoogleMapsResult {
   useEffect(() => {
     if (!apiKey) return
 
-    // Already loaded
+    // Google calls this on auth/billing failure. Surface a real error
+    // and clear the stored key so the user can re-enter it.
+    window.gm_authFailure = () => {
+      setError(
+        'Google Maps rejected this API key. Check that billing is enabled, that "Maps JavaScript API" is enabled, and that referer restrictions allow this origin.',
+      )
+      localStorage.removeItem('gmaps_api_key')
+    }
+
+    // Already loaded in this page
     if (window.google?.maps) {
       setIsLoaded(true)
       return
     }
 
-    // Expose callback
-    window.initMap = () => {
-      setIsLoaded(true)
+    // Script tag already exists (e.g. StrictMode double-mount) — just wait for it.
+    const existing = document.getElementById(SCRIPT_ID) as HTMLScriptElement | null
+    if (existing) {
+      window.initMap = () => setIsLoaded(true)
+      return
     }
 
+    window.initMap = () => setIsLoaded(true)
+
     const script = document.createElement('script')
-    script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=drawing,geometry,places&callback=initMap`
+    script.id = SCRIPT_ID
+    script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=drawing,geometry,places&callback=initMap&loading=async`
     script.async = true
     script.defer = true
-    script.onerror = () => setError('Failed to load Google Maps API. Check your API key.')
+    script.onerror = () =>
+      setError('Failed to load Google Maps API. Check your API key and network.')
     document.head.appendChild(script)
 
     return () => {
-      // Cleanup callback; leave script tag in place if loaded
       delete window.initMap
     }
   }, [apiKey])
