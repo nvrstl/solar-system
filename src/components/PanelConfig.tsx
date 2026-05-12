@@ -1,5 +1,5 @@
 import { PANEL_MODELS } from '../constants/panels'
-import type { PanelModel } from '../types'
+import type { Orientation, PanelModel } from '../types'
 
 function azimuthLabel(deg: number): string {
   if (deg >= -22.5 && deg < 22.5) return 'S'
@@ -16,6 +16,8 @@ function azimuthLabel(deg: number): string {
 interface Props {
   model: PanelModel
   onModelChange: (m: PanelModel) => void
+  orientation: Orientation
+  onOrientationChange: (o: Orientation) => void
   tilt: number
   onTiltChange: (t: number) => void
   azimuth: number
@@ -27,6 +29,8 @@ interface Props {
 export function PanelConfig({
   model,
   onModelChange,
+  orientation,
+  onOrientationChange,
   tilt,
   onTiltChange,
   azimuth,
@@ -34,6 +38,9 @@ export function PanelConfig({
   margin,
   onMarginChange,
 }: Props) {
+  const areaM2 = model.longSideM * model.shortSideM
+  const wPerM2 = model.watts / areaM2
+
   return (
     <div className="space-y-3">
       <div>
@@ -50,10 +57,68 @@ export function PanelConfig({
         >
           {PANEL_MODELS.map((m) => (
             <option key={m.name} value={m.name}>
-              {m.name} ({m.widthM}m × {m.heightM}m)
+              {m.custom
+                ? m.name
+                : `${m.name} — ${m.longSideM}×${m.shortSideM} m`}
             </option>
           ))}
         </select>
+        <p className="text-xs text-gray-400 mt-1">
+          {model.watts} W · {areaM2.toFixed(2)} m² · {wPerM2.toFixed(0)} W/m²
+        </p>
+      </div>
+
+      {model.custom && (
+        <div className="grid grid-cols-3 gap-2 bg-gray-50 rounded-lg p-3 border border-gray-200">
+          <NumberField
+            label="Watts"
+            value={model.watts}
+            step={5}
+            min={100}
+            max={800}
+            onChange={(v) => onModelChange({ ...model, watts: v })}
+          />
+          <NumberField
+            label="Long (m)"
+            value={model.longSideM}
+            step={0.01}
+            min={0.5}
+            max={3}
+            onChange={(v) => onModelChange({ ...model, longSideM: v })}
+          />
+          <NumberField
+            label="Short (m)"
+            value={model.shortSideM}
+            step={0.01}
+            min={0.4}
+            max={2}
+            onChange={(v) => onModelChange({ ...model, shortSideM: v })}
+          />
+        </div>
+      )}
+
+      <div>
+        <label className="block text-xs font-semibold text-gray-500 uppercase mb-1">
+          Orientation
+        </label>
+        <div className="grid grid-cols-2 gap-2">
+          <OrientationButton
+            active={orientation === 'landscape'}
+            onClick={() => onOrientationChange('landscape')}
+            label="Landscape"
+            sub="long edge along ridge"
+            iconLong={28}
+            iconShort={16}
+          />
+          <OrientationButton
+            active={orientation === 'portrait'}
+            onClick={() => onOrientationChange('portrait')}
+            label="Portrait"
+            sub="long edge up the slope"
+            iconLong={16}
+            iconShort={28}
+          />
+        </div>
       </div>
 
       <div>
@@ -113,5 +178,80 @@ export function PanelConfig({
         </div>
       </div>
     </div>
+  )
+}
+
+function NumberField({
+  label,
+  value,
+  step,
+  min,
+  max,
+  onChange,
+}: {
+  label: string
+  value: number
+  step: number
+  min: number
+  max: number
+  onChange: (v: number) => void
+}) {
+  return (
+    <label className="block">
+      <span className="block text-[10px] font-semibold text-gray-500 uppercase mb-1">
+        {label}
+      </span>
+      <input
+        type="number"
+        value={value}
+        step={step}
+        min={min}
+        max={max}
+        onChange={(e) => {
+          const n = Number(e.target.value)
+          if (!Number.isNaN(n)) onChange(n)
+        }}
+        className="w-full border border-gray-200 rounded-md px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+      />
+    </label>
+  )
+}
+
+function OrientationButton({
+  active,
+  onClick,
+  label,
+  sub,
+  iconLong,
+  iconShort,
+}: {
+  active: boolean
+  onClick: () => void
+  label: string
+  sub: string
+  iconLong: number
+  iconShort: number
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`flex items-center gap-2 px-3 py-2 rounded-lg border text-left text-sm transition-colors ${
+        active
+          ? 'bg-blue-50 border-blue-400 text-blue-700'
+          : 'bg-white border-gray-200 text-gray-600 hover:border-blue-300'
+      }`}
+    >
+      <span
+        className={`inline-block rounded-sm ${
+          active ? 'bg-blue-500' : 'bg-gray-400'
+        }`}
+        style={{ width: iconLong, height: iconShort }}
+      />
+      <span className="flex flex-col leading-tight">
+        <span className="font-semibold">{label}</span>
+        <span className="text-[10px] text-gray-400">{sub}</span>
+      </span>
+    </button>
   )
 }

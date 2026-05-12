@@ -9,11 +9,14 @@ export interface Panel {
   corners: LatLng[] // 4 corners
 }
 
+export type Orientation = 'landscape' | 'portrait'
+
 export interface PanelModel {
   name: string
   watts: number
-  widthM: number
-  heightM: number
+  longSideM: number  // physical long edge of the module
+  shortSideM: number // physical short edge of the module
+  custom?: boolean
 }
 
 export interface ROIInputs {
@@ -28,6 +31,7 @@ export interface PVGISResult {
   annualKWh: number
   loading: boolean
   error: string | null
+  source?: 'pvgis' | 'estimate'
 }
 
 export interface ROIResult {

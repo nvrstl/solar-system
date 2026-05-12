@@ -1,4 +1,4 @@
-import type { Panel, PanelModel, ROIInputs, ROIResult, PVGISResult } from '../types'
+import type { Orientation, Panel, PanelModel, ROIInputs, ROIResult, PVGISResult } from '../types'
 import { PanelConfig } from './PanelConfig'
 import { ROIPanel } from './ROIPanel'
 import { ExportButton } from './ExportButton'
@@ -8,9 +8,15 @@ interface Props {
   address: string
   onAddressChange: (a: string) => void
 
+  // Client
+  clientName: string
+  onClientNameChange: (n: string) => void
+
   // Panel config
   model: PanelModel
   onModelChange: (m: PanelModel) => void
+  orientation: Orientation
+  onOrientationChange: (o: Orientation) => void
   tilt: number
   onTiltChange: (t: number) => void
   azimuth: number
@@ -32,8 +38,12 @@ interface Props {
 export function Sidebar({
   address,
   onAddressChange,
+  clientName,
+  onClientNameChange,
   model,
   onModelChange,
+  orientation,
+  onOrientationChange,
   tilt,
   onTiltChange,
   azimuth,
@@ -51,19 +61,33 @@ export function Sidebar({
 
   return (
     <aside className="w-[380px] min-w-[320px] bg-white border-r border-gray-100 flex flex-col overflow-y-auto">
-      {/* Address search */}
-      <div className="p-4 border-b border-gray-100">
-        <label className="block text-xs font-semibold text-gray-500 uppercase mb-1">
-          Address / Location
-        </label>
-        <input
-          id="address-search"
-          type="text"
-          placeholder="Search address…"
-          value={address}
-          onChange={(e) => onAddressChange(e.target.value)}
-          className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-        />
+      {/* Client + address */}
+      <div className="p-4 border-b border-gray-100 space-y-3">
+        <div>
+          <label className="block text-xs font-semibold text-gray-500 uppercase mb-1">
+            Client name
+          </label>
+          <input
+            type="text"
+            placeholder="e.g. Jan Janssens"
+            value={clientName}
+            onChange={(e) => onClientNameChange(e.target.value)}
+            className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
+        </div>
+        <div>
+          <label className="block text-xs font-semibold text-gray-500 uppercase mb-1">
+            Address / Location
+          </label>
+          <input
+            id="address-search"
+            type="text"
+            placeholder="Search address…"
+            value={address}
+            onChange={(e) => onAddressChange(e.target.value)}
+            className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
+        </div>
       </div>
 
       {/* Panel config */}
@@ -71,6 +95,8 @@ export function Sidebar({
         <PanelConfig
           model={model}
           onModelChange={onModelChange}
+          orientation={orientation}
+          onOrientationChange={onOrientationChange}
           tilt={tilt}
           onTiltChange={onTiltChange}
           azimuth={azimuth}
@@ -105,6 +131,14 @@ export function Sidebar({
         {pvgis.loading && (
           <p className="text-xs text-blue-500 mt-2 animate-pulse">Fetching PVGIS data…</p>
         )}
+        {pvgis.source === 'estimate' && !pvgis.loading && (
+          <p className="text-xs text-amber-600 mt-2">
+            PVGIS unreachable — using local estimate (±10%).
+          </p>
+        )}
+        {pvgis.source === 'pvgis' && !pvgis.loading && (
+          <p className="text-xs text-gray-400 mt-2">Source: PVGIS (JRC).</p>
+        )}
       </Section>
 
       {/* ROI */}
@@ -125,6 +159,7 @@ export function Sidebar({
           pvgis={pvgis}
           roi={roi}
           address={address}
+          clientName={clientName}
         />
       </div>
     </aside>

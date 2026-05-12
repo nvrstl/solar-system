@@ -1,4 +1,4 @@
-import type { LatLng, Panel, PanelModel } from '../types'
+import type { LatLng, Orientation, Panel, PanelModel } from '../types'
 import { latLngToXY, xyToLatLng, rotatePt, pointInPolygon, centroid } from './geoUtils'
 
 
@@ -84,11 +84,17 @@ export function fillRoofWithPanels(
   gutterY: number,
   rotationOverrideDeg?: number,
   tiltDeg = 0,
-  marginM = 0.3
+  marginM = 0.3,
+  orientation: Orientation = 'landscape'
 ): Panel[] {
   if (roofLatLngs.length < 3) return []
 
   const cosTilt = Math.cos((tiltDeg * Math.PI) / 180)
+
+  // Landscape: long edge runs along the ridge (X axis after rotation).
+  // Portrait : short edge runs along the ridge; long edge points up the slope.
+  const widthM  = orientation === 'landscape' ? model.longSideM  : model.shortSideM
+  const heightM = orientation === 'landscape' ? model.shortSideM : model.longSideM
 
   const ref = centroid(roofLatLngs)
   const xyPoly = roofLatLngs.map((p) => latLngToXY(p, ref))
@@ -113,15 +119,15 @@ export function fillRoofWithPanels(
   const minY = Math.min(...ys)
   const maxY = Math.max(...ys)
 
-  const stepX = model.widthM + gutterX
-  const hhProjected = (model.heightM / 2) * cosTilt
-  const stepY = model.heightM * cosTilt + gutterY
-  const hw = model.widthM / 2
+  const stepX = widthM + gutterX
+  const hhProjected = (heightM / 2) * cosTilt
+  const stepY = heightM * cosTilt + gutterY
+  const hw = widthM / 2
 
   const panels: Panel[] = []
   let idx = 0
 
-  for (let cx = minX + model.widthM / 2; cx < maxX; cx += stepX) {
+  for (let cx = minX + widthM / 2; cx < maxX; cx += stepX) {
     for (let cy = minY + hhProjected; cy < maxY; cy += stepY) {
       const corners = [
         { x: cx - hw, y: cy - hhProjected },

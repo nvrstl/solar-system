@@ -6,7 +6,7 @@ import { useGoogleMaps } from './hooks/useGoogleMaps'
 import { usePVGIS } from './hooks/usePVGIS'
 import { calcROI } from './utils/roiCalc'
 import { PANEL_MODELS } from './constants/panels'
-import type { Panel, PanelModel, ROIInputs, LatLng } from './types'
+import type { Orientation, Panel, PanelModel, ROIInputs, LatLng } from './types'
 
 const DEFAULT_ROI: ROIInputs = {
   elecPrice: 0.28,
@@ -25,11 +25,13 @@ export default function App() {
 
   const { isLoaded, error: mapsError } = useGoogleMaps(apiKey)
 
-  // Address
+  // Address + client
   const [address, setAddress] = useState('')
+  const [clientName, setClientName] = useState('')
 
   // Panel config
   const [model, setModel] = useState<PanelModel>(PANEL_MODELS[0])
+  const [orientation, setOrientation] = useState<Orientation>('landscape')
   const [tilt, setTilt] = useState(35)
   const [azimuth, setAzimuth] = useState(0)
   const [margin, setMargin] = useState(0.3)
@@ -104,8 +106,12 @@ export default function App() {
         <Sidebar
           address={address}
           onAddressChange={setAddress}
+          clientName={clientName}
+          onClientNameChange={setClientName}
           model={model}
           onModelChange={setModel}
+          orientation={orientation}
+          onOrientationChange={setOrientation}
           tilt={tilt}
           onTiltChange={setTilt}
           azimuth={azimuth}
@@ -123,6 +129,7 @@ export default function App() {
           <MapView
             isLoaded={isLoaded}
             model={model}
+            orientation={orientation}
             tilt={tilt}
             azimuth={azimuth}
             margin={margin}

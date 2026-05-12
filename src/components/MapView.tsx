@@ -1,11 +1,12 @@
 import { useEffect, useRef, useCallback, useState } from 'react'
-import type { Panel, PanelModel, LatLng } from '../types'
+import type { Orientation, Panel, PanelModel, LatLng } from '../types'
 import { fillRoofWithPanels } from '../utils/panelLayout'
 import { GUTTER_X, GUTTER_Y } from '../constants/panels'
 
 interface Props {
   isLoaded: boolean
   model: PanelModel
+  orientation: Orientation
   tilt: number
   azimuth: number
   margin: number
@@ -39,6 +40,7 @@ const DISABLED_STYLE = {
 export function MapView({
   isLoaded,
   model,
+  orientation,
   tilt,
   azimuth,
   margin,
@@ -61,6 +63,27 @@ export function MapView({
 
   // Move mode
   const [moveMode, setMoveMode] = useState(false)
+
+  // Measure mode (click two points → distance in meters)
+  const [measureMode, setMeasureMode] = useState(false)
+  const measureModeRef = useRef(false)
+  useEffect(() => { measureModeRef.current = measureMode }, [measureMode])
+  const measurePointsRef = useRef<google.maps.LatLng[]>([])
+  const measureMarkersRef = useRef<google.maps.Marker[]>([])
+  const measurePolylineRef = useRef<google.maps.Polyline | null>(null)
+  const measureLabelRef = useRef<google.maps.InfoWindow | null>(null)
+  const [measureText, setMeasureText] = useState<string | null>(null)
+
+  const clearMeasurement = useCallback(() => {
+    measureMarkersRef.current.forEach((m) => m.setMap(null))
+    measureMarkersRef.current = []
+    measurePolylineRef.current?.setMap(null)
+    measurePolylineRef.current = null
+    measureLabelRef.current?.close()
+    measureLabelRef.current = null
+    measurePointsRef.current = []
+    setMeasureText(null)
+  }, [])
 
   // Drag tracking
   const isDraggingRef = useRef(false)
@@ -85,6 +108,9 @@ export function MapView({
 
   const marginRef = useRef(margin)
   useEffect(() => { marginRef.current = margin }, [margin])
+
+  const orientationRef = useRef(orientation)
+  useEffect(() => { orientationRef.current = orientation }, [orientation])
 
   // Arrow keys: nudge all panels (0.1 m, Shift = 1 m)
   useEffect(() => {
@@ -172,12 +198,13 @@ export function MapView({
     m: PanelModel,
     t: number,
     az: number,
-    mg: number
+    mg: number,
+    o: Orientation,
   ): Panel[] => {
     const allPanels: Panel[] = []
     let globalIdx = 0
     for (const latLngs of allLatLngs) {
-      const areaPanels = fillRoofWithPanels(latLngs, m, GUTTER_X, GUTTER_Y, -az, t, mg)
+      const areaPanels = fillRoofWithPanels(latLngs, m, GUTTER_X, GUTTER_Y, -az, t, mg, o)
       for (const p of areaPanels) {
         allPanels.push({ ...p, id: `panel-${globalIdx++}` })
       }
@@ -216,6 +243,62 @@ export function MapView({
         }
       })
     }
+
+    // Measure mode: click two points → polyline + distance label
+    map.addListener('click', (e: google.maps.MapMouseEvent) => {
+      if (!measureModeRef.current || !e.latLng) return
+
+      // Start fresh after two points are already placed
+      if (measurePointsRef.current.length >= 2) {
+        measureMarkersRef.current.forEach((m) => m.setMap(null))
+        measureMarkersRef.current = []
+        measurePolylineRef.current?.setMap(null)
+        measurePolylineRef.current = null
+        measureLabelRef.current?.close()
+        measureLabelRef.current = null
+        measurePointsRef.current = []
+      }
+
+      measurePointsRef.current.push(e.latLng)
+      const marker = new google.maps.Marker({
+        position: e.latLng,
+        map,
+        icon: {
+          path: google.maps.SymbolPath.CIRCLE,
+          scale: 5,
+          fillColor: '#FF3333',
+          fillOpacity: 1,
+          strokeColor: '#FFFFFF',
+          strokeWeight: 2,
+        },
+      })
+      measureMarkersRef.current.push(marker)
+
+      if (measurePointsRef.current.length === 2) {
+        const [a, b] = measurePointsRef.current
+        const distM =
+          google.maps.geometry.spherical.computeDistanceBetween(a, b)
+        measurePolylineRef.current = new google.maps.Polyline({
+          path: [a, b],
+          map,
+          strokeColor: '#FF3333',
+          strokeWeight: 2,
+          strokeOpacity: 0.95,
+        })
+        const mid = new google.maps.LatLng(
+          (a.lat() + b.lat()) / 2,
+          (a.lng() + b.lng()) / 2
+        )
+        const text = `${distM.toFixed(2)} m`
+        measureLabelRef.current = new google.maps.InfoWindow({
+          content: `<div style="font-weight:600;color:#222;padding:2px 4px;">${text}</div>`,
+          position: mid,
+          disableAutoPan: true,
+        })
+        measureLabelRef.current.open(map)
+        setMeasureText(text)
+      }
+    })
 
     map.addListener('mousemove', (e: google.maps.MapMouseEvent) => {
       if (!isDraggingRef.current || !dragStartLatLngRef.current || !e.latLng) return
@@ -297,23 +380,40 @@ export function MapView({
         tiltRef.current,
         azimuthRef.current,
         marginRef.current,
+        orientationRef.current,
       )
       onPanelsChangeRef.current(newPanels)
       setAreaCount(roofLatLngsRef.current.length)
     })
   }, [isLoaded, refillAllAreas]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Re-fill panels when model/tilt/azimuth changes
+  // Re-fill panels when model/orientation/tilt/azimuth changes
   useEffect(() => {
     if (!roofLatLngsRef.current.length) return
-    const newPanels = refillAllAreas(roofLatLngsRef.current, model, tilt, azimuth, margin)
+    const newPanels = refillAllAreas(roofLatLngsRef.current, model, tilt, azimuth, margin, orientation)
     onPanelsChange(newPanels)
-  }, [model, tilt, azimuth, margin]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [model, orientation, tilt, azimuth, margin]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Sync panel polygon visuals
   useEffect(() => {
     renderPanelPolygons(panels)
   }, [panels, renderPanelPolygons])
+
+  // Pause drawing manager while measuring (otherwise a click starts a polygon)
+  useEffect(() => {
+    const dm = drawingManagerRef.current
+    if (!dm) return
+    if (measureMode) {
+      dm.setDrawingMode(null)
+      dm.setOptions({ drawingControl: false })
+    } else {
+      dm.setOptions({ drawingControl: true })
+      if (!areaCount || roofLatLngsRef.current.length === 0) {
+        // No areas yet — keep polygon tool active
+        dm.setDrawingMode(google.maps.drawing.OverlayType.POLYGON)
+      }
+    }
+  }, [measureMode, areaCount])
 
   const handleReset = () => {
     roofPolygonsRef.current.forEach((p) => p.setMap(null))
@@ -323,6 +423,8 @@ export function MapView({
     panelPolygonsRef.current = []
     drawingManagerRef.current?.setDrawingMode(google.maps.drawing.OverlayType.POLYGON)
     setMoveMode(false)
+    setMeasureMode(false)
+    clearMeasurement()
     setAreaCount(0)
     onResetRoof()
   }
@@ -331,11 +433,39 @@ export function MapView({
     <div className="relative w-full h-full" id="map-container">
       <div ref={mapDivRef} className="w-full h-full" />
 
+      <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex items-center gap-2 z-10">
+        <button
+          onClick={() => {
+            setMeasureMode((m) => {
+              const next = !m
+              if (!next) clearMeasurement()
+              if (next) setMoveMode(false)
+              return next
+            })
+          }}
+          title="Click two points on the map to measure distance in meters"
+          className={`shadow-lg border text-sm font-semibold px-4 py-2 rounded-full transition-colors ${
+            measureMode
+              ? 'bg-red-600 border-red-700 text-white hover:bg-red-700'
+              : 'bg-white border-gray-200 text-gray-700 hover:bg-red-50 hover:border-red-300 hover:text-red-600'
+          }`}
+        >
+          {measureMode
+            ? measureText
+              ? `📏 ${measureText} — click to remeasure`
+              : '📏 Measuring — click 2 points'
+            : '📏 Measure'}
+        </button>
+      </div>
+
       {areaCount > 0 && (
-        <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex items-center gap-2 z-10">
+        <div className="absolute bottom-16 left-1/2 -translate-x-1/2 flex items-center gap-2 z-10">
           {panels.length > 0 && (
             <button
-              onClick={() => setMoveMode((m) => !m)}
+              onClick={() => {
+                setMoveMode((m) => !m)
+                setMeasureMode(false)
+              }}
               title="Drag panels or use arrow keys (Shift = larger step)"
               className={`shadow-lg border text-sm font-semibold px-4 py-2 rounded-full transition-colors ${
                 moveMode

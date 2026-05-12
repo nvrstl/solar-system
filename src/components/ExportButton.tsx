@@ -8,15 +8,16 @@ interface Props {
   pvgis: PVGISResult
   roi: ROIResult | null
   address: string
+  clientName: string
 }
 
-export function ExportButton({ panelCount, kWp, pvgis, roi, address }: Props) {
+export function ExportButton({ panelCount, kWp, pvgis, roi, address, clientName }: Props) {
   const [exporting, setExporting] = useState(false)
 
   const handleClick = async () => {
     setExporting(true)
     try {
-      await exportPDF({ panelCount, kWp, pvgis, roi, address })
+      await exportPDF({ panelCount, kWp, pvgis, roi, address, clientName })
     } finally {
       setExporting(false)
     }
